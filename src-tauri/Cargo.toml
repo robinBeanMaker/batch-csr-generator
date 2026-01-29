@@ -1,0 +1,32 @@
+[package]
+name = "batch-csr-generator"
+version = "1.0.0"
+description = "批量CSR生成器 - 使用Tauri + React实现"
+authors = ["Developer"]
+edition = "2021"
+
+[lib]
+name = "batch_csr_generator_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# CSR生成 - 使用openssl
+openssl = "0.10"
+# CSV处理
+csv = "1.3"
+# 正则表达式
+regex = "1"
+# 错误处理
+anyhow = "1"
+
+[features]
+default = []
+custom-protocol = ["tauri/custom-protocol"]

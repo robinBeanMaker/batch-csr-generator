@@ -1,0 +1,330 @@
+/* 全局样式 */
+:root {
+  --primary-color: #4a90d9;
+  --primary-hover: #357abd;
+  --success-color: #28a745;
+  --error-color: #dc3545;
+  --warning-color: #ffc107;
+  --bg-color: #f5f5f5;
+  --card-bg: #ffffff;
+  --text-color: #333333;
+  --text-secondary: #666666;
+  --border-color: #e0e0e0;
+  --input-bg: #ffffff;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+/* 容器 */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* 标题 */
+.app-title {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* 卡片样式 */
+.card {
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 表单样式 */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
+}
+
+.form-input:disabled,
+.form-select:disabled {
+  background-color: #f0f0f0;
+  cursor: not-allowed;
+}
+
+.form-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.form-input-group .form-input {
+  flex: 1;
+}
+
+/* 按钮样式 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.btn-success {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-large {
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* 生成按钮容器 */
+.generate-btn-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* 日志区域 */
+.log-area {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 13px;
+  padding: 15px;
+  border-radius: 6px;
+  height: 250px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.log-area::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 4px;
+}
+
+.log-area::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.log-area::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* 日志消息样式 */
+.log-success {
+  color: #4ec9b0;
+}
+
+.log-error {
+  color: #f14c4c;
+}
+
+.log-info {
+  color: #3794ff;
+}
+
+.log-warning {
+  color: #cca700;
+}
+
+/* 进度条 */
+.progress-container {
+  margin-top: 15px;
+}
+
+.progress-bar-wrapper {
+  background-color: #e9ecef;
+  border-radius: 10px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), #6bb3f8);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color);
+  line-height: 24px;
+}
+
+/* 状态标签 */
+.status-label {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* 提示文字 */
+.hint-text {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* 日期时间选择器 */
+.datetime-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.datetime-picker .form-input {
+  flex: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .container {
+    padding: 15px;
+  }
+}
+
+/* 工具提示 */
+[title] {
+  position: relative;
+}
+
+/* 文件选择按钮 */
+.file-input-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.file-input-wrapper .form-input {
+  flex: 1;
+}
+
+/* 动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.generating {
+  animation: pulse 1.5s ease-in-out infinite;
+}
