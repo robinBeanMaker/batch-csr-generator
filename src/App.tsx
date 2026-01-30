@@ -1,7 +1,27 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { open } from "@tauri-apps/plugin-shell";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  Card,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  Button,
+  Progress,
+  Typography,
+  Row,
+  Col,
+  Space,
+  message,
+} from "antd";
+import {
+  PlayCircleOutlined,
+  FolderOpenOutlined,
+  SettingOutlined,
+  FileTextOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
 
 // 密钥类型枚举
 const KEY_TYPES = [
@@ -40,19 +60,18 @@ interface GenerateResult {
 
 function App() {
   // 表单状态
+  const [form] = Form.useForm();
   const [cnRange, setCnRange] = useState("YDL0001-YDL0010");
   const [subjectTemplate, setSubjectTemplate] = useState(
     "CN=[{CN}]; O=[TrustAsia Technologies\\\\, Inc.]; OU=[部门1]"
   );
   const [keyType, setKeyType] = useState("RSA_2048");
   const [signHashAlg, setSignHashAlg] = useState("SHA256");
-  const [notBefore, setNotBefore] = useState(formatDateTimeLocal(new Date()));
-  const [notAfter, setNotAfter] = useState(
-    formatDateTimeLocal(new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000))
-  );
+  const [notBefore, setNotBefore] = useState(dayjs());
+  const [notAfter, setNotAfter] = useState(dayjs().add(10, 'year'));
   const [uniqueId, setUniqueId] = useState("");
   const [sans, setSans] = useState("");
-  const [outputPath, setOutputPath] = useState("output.csv");
+  const [outputDir, setOutputDir] = useState("");
 
   // UI状态
   const [isGenerating, setIsGenerating] = useState(false);
@@ -64,7 +83,7 @@ function App() {
   // 日志区域引用
   const logAreaRef = useRef<HTMLDivElement>(null);
 
-  // 格式化日期时间为本地输入格式
+  /*// 格式化日期时间为本地输入格式
   function formatDateTimeLocal(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -73,13 +92,13 @@ function App() {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const seconds = String(date.getSeconds()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-  }
+  }*/
 
-  // 格式化日期时间为ISO8601格式
+  /*// 格式化日期时间为ISO8601格式
   function formatISO8601(dateStr: string): string {
     const date = new Date(dateStr);
     return date.toISOString();
-  }
+  }*/
 
   // 获取文件名时间戳
   function getFileTimestamp(): string {
@@ -107,51 +126,55 @@ function App() {
     }
   }, [logs]);
 
-  // 浏览输出文件
-  async function browseOutputFile() {
+  // 浏览输出目录
+  async function browseOutputDir() {
     try {
-      const filePath = await save({
-        defaultPath: "output.csv",
-        filters: [{ name: "CSV文件", extensions: ["csv"] }],
+      const dirPath = await openDialog({
+        directory: true,
+        multiple: false,
       });
-      if (filePath) {
-        setOutputPath(filePath);
+      if (dirPath) {
+        setOutputDir(dirPath as string);
+        // 同时更新表单字段的值
+        form.setFieldsValue({ outputDir: dirPath as string });
       }
     } catch (error) {
-      console.error("选择文件失败:", error);
+      console.error("选择目录失败:", error);
     }
   }
 
   // 开始生成
   async function startGeneration() {
-    // 验证输入
-    if (!cnRange.trim()) {
-      alert("请输入通用名称范围！");
-      return;
-    }
-    if (!subjectTemplate.trim()) {
-      alert("请输入Subject主题模板！");
-      return;
-    }
-    if (new Date(notBefore) > new Date(notAfter)) {
-      alert("有效期开始时间不能晚于结束时间！");
-      return;
-    }
-    if (!outputPath.trim()) {
-      alert("请指定输出文件路径！");
+    try {
+      // 使用 Ant Design 表单验证
+      await form.validateFields();
+    } catch (error) {
+      message.error("请检查表单输入！");
       return;
     }
 
-    // 为文件名添加时间戳
-    let finalOutputPath = outputPath;
-    const timestamp = getFileTimestamp();
-    // 移除已有的时间戳格式
-    let basePath = finalOutputPath.replace(/_\d{8}_\d{6}(\.csv)?$/i, "");
-    if (basePath.toLowerCase().endsWith(".csv")) {
-      basePath = basePath.slice(0, -4);
+    // 验证输入
+    if (!cnRange.trim()) {
+      message.error("请输入通用名称范围！");
+      return;
     }
-    finalOutputPath = `${basePath}_${timestamp}.csv`;
-    setOutputPath(finalOutputPath);
+    if (!subjectTemplate.trim()) {
+      message.error("请输入Subject主题模板！");
+      return;
+    }
+    if (notBefore.isAfter(notAfter)) {
+      message.error("有效期开始时间不能晚于结束时间！");
+      return;
+    }
+    if (!outputDir.trim()) {
+      message.error("请选择输出目录！");
+      return;
+    }
+
+    // 在选定目录中生成带时间戳的CSV文件
+    const timestamp = getFileTimestamp();
+    const fileName = `csr_batch_${timestamp}.csv`;
+    const finalOutputPath = `${outputDir}/${fileName}`;
 
     // 开始生成
     setIsGenerating(true);
@@ -167,250 +190,364 @@ function App() {
     addLog(`密钥类型: ${keyType}`);
     addLog(`签名哈希算法: ${signHashAlg}`);
     addLog(`Subject模板: ${subjectTemplate}`);
-    addLog(`notBefore: ${notBefore}`);
-    addLog(`notAfter: ${notAfter}`);
+    addLog(`notBefore: ${notBefore.format('YYYY-MM-DDTHH:mm:ss+08:00')}`);
+    addLog(`notAfter: ${notAfter.format('YYYY-MM-DDTHH:mm:ss+08:00')}`);
     if (uniqueId) addLog(`uniqueId: ${uniqueId}`);
     if (sans) addLog(`sans: ${sans}`);
     addLog(`输出文件: ${finalOutputPath}`);
     addLog("");
 
-    try {
-      // 调用Rust后端生成CSR
-      const params: GenerateParams = {
-        cn_range: cnRange.trim(),
-        subject_template: subjectTemplate.trim(),
-        key_type: keyType,
-        sign_hash_alg: signHashAlg,
-        not_before: formatISO8601(notBefore),
-        not_after: formatISO8601(notAfter),
-        unique_id: uniqueId.trim(),
-        sans: sans.trim(),
-        output_path: finalOutputPath,
-      };
+    // 使用 setTimeout 让UI有时间更新，避免卡顿
+    setTimeout(async () => {
+      try {
+        // 调用Rust后端生成CSR
+        const params: GenerateParams = {
+          cn_range: cnRange.trim(),
+          subject_template: subjectTemplate.trim(),
+          key_type: keyType,
+          sign_hash_alg: signHashAlg,
+          not_before: notBefore.format('YYYY-MM-DDTHH:mm:ss+08:00'),
+          not_after: notAfter.format('YYYY-MM-DDTHH:mm:ss+08:00'),
+          unique_id: uniqueId.trim(),
+          sans: sans.trim(),
+          output_path: finalOutputPath,
+        };
 
-      // 监听进度事件
-      const unlisten = await invoke<GenerateResult>("generate_csr_batch", { params });
+        // 解析CN范围以计算总数
+        /*const cnRangeMatch = cnRange.match(/(\w+)(\d+)-(\w+)(\d+)/);
+        if (cnRangeMatch) {
+          const startNum = parseInt(cnRangeMatch[2]);
+          const endNum = parseInt(cnRangeMatch[4]);
+        }*/
 
-      // 处理结果
-      if (unlisten.success) {
-        addLog("");
-        addLog("========================================", "success");
-        addLog("生成完成！", "success");
-        addLog(`共生成 ${unlisten.total} 个CSR`, "success");
-        addLog(`输出文件: ${unlisten.output_path}`, "success");
-        addLog("========================================", "success");
-
-        setProgress(100);
-        setProgressText("完成");
-        setStatusText(`生成完成！共 ${unlisten.total} 个CSR`);
-
-        // 询问是否打开文件所在目录
-        const openDir = confirm(
-          `CSR生成完成！共生成 ${unlisten.total} 个。\n是否打开输出文件所在目录？`
-        );
-        if (openDir) {
-          // 获取文件所在目录
-          const dirPath = unlisten.output_path.substring(
-            0,
-            unlisten.output_path.lastIndexOf("/")
-          ) || unlisten.output_path.substring(
-            0,
-            unlisten.output_path.lastIndexOf("\\")
-          );
-          if (dirPath) {
-            await open(dirPath);
+        // 启动进度模拟
+        let currentProgress = 5; // 从5%开始
+        setProgress(5);
+        setProgressText("初始化...");
+        
+        const progressInterval = setInterval(() => {
+          currentProgress += Math.random() * 5 + 3; // 每次增加3-8%
+          if (currentProgress >= 90) {
+            currentProgress = 90; // 在90%停止，等待实际完成
+            clearInterval(progressInterval);
+            setProgressText("即将完成...");
           }
+          
+          const roundedProgress = Math.floor(currentProgress);
+          setProgress(roundedProgress);
+          
+          // 更新进度文本
+          if (currentProgress < 25) {
+            setProgressText("初始化...");
+          } else if (currentProgress < 50) {
+            setProgressText("生成密钥对...");
+          } else if (currentProgress < 75) {
+            setProgressText("生成CSR...");
+          } else if (currentProgress < 90) {
+            setProgressText("保存文件...");
+          } else {
+            setProgressText("即将完成...");
+          }
+          
+          console.log(`进度更新: ${roundedProgress}%`); // 调试日志
+        }, 500);
+
+        // 监听进度事件
+        const unlisten = await invoke<GenerateResult>("generate_csr_batch", { params });
+
+        // 清除进度模拟
+        clearInterval(progressInterval);
+
+        // 处理结果
+        if (unlisten.success) {
+          addLog("");
+          addLog("========================================", "success");
+          addLog("生成完成！", "success");
+          addLog(`共生成 ${unlisten.total} 个CSR`, "success");
+          addLog(`输出文件: ${unlisten.output_path}`, "success");
+          addLog("========================================", "success");
+
+          setProgress(100);
+          setProgressText("完成");
+          setStatusText(`生成完成！共 ${unlisten.total} 个CSR`);
+
+          // 显示生成完成消息
+          message.success(`CSR生成完成！共生成 ${unlisten.total} 个，文件已保存到：${unlisten.output_path}`);
+        } else {
+          throw new Error(unlisten.message);
         }
-      } else {
-        throw new Error(unlisten.message);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        addLog(`发生错误: ${errorMsg}`, "error");
+        setProgress(0);
+        setProgressText("错误");
+        setStatusText("生成失败");
+        message.error(`生成过程中发生错误: ${errorMsg}`);
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      addLog(`发生错误: ${errorMsg}`, "error");
-      setProgress(0);
-      setProgressText("错误");
-      setStatusText("生成失败");
-      alert(`生成过程中发生错误: ${errorMsg}`);
-    } finally {
-      setIsGenerating(false);
-    }
+    }, 100); // 100ms 延迟让UI有时间更新
   }
 
   return (
-    <div className="container">
-      <h1 className="app-title">批量CSR生成器 v1.0</h1>
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <Typography.Title level={1} style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <SettingOutlined style={{ marginRight: '12px' }} />
+        批量CSR生成器 v1.0
+      </Typography.Title>
 
       {/* 参数设置卡片 */}
-      <div className="card">
-        <h2 className="card-title">参数设置</h2>
-
-        {/* 通用名称范围 */}
-        <div className="form-group">
-          <label className="form-label">通用名称(CN)范围:</label>
-          <input
-            type="text"
-            className="form-input"
-            value={cnRange}
-            onChange={(e) => setCnRange(e.target.value)}
-            placeholder="格式示例: YDL0001-YDL0010"
-            disabled={isGenerating}
-          />
-          <div className="hint-text">格式示例: YDL0001-YDL0010</div>
-        </div>
-
-        {/* Subject主题模板 */}
-        <div className="form-group">
-          <label className="form-label">Subject主题模板:</label>
-          <input
-            type="text"
-            className="form-input"
-            value={subjectTemplate}
-            onChange={(e) => setSubjectTemplate(e.target.value)}
-            placeholder="使用{CN}作为通用名称占位符"
-            disabled={isGenerating}
-          />
-          <div className="hint-text">使用{"{CN}"}作为通用名称占位符，多值用逗号分隔，值中逗号用\,转义</div>
-        </div>
-
-        {/* 密钥类型和签名哈希算法 */}
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">密钥类型:</label>
-            <select
-              className="form-select"
-              value={keyType}
-              onChange={(e) => setKeyType(e.target.value)}
-              disabled={isGenerating}
-            >
-              {KEY_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">签名哈希算法:</label>
-            <select
-              className="form-select"
-              value={signHashAlg}
-              onChange={(e) => setSignHashAlg(e.target.value)}
-              disabled={isGenerating}
-            >
-              {SIGN_HASH_ALGORITHMS.map((alg) => (
-                <option key={alg} value={alg}>
-                  {alg}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* 有效期 */}
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">notBefore(有效期开始):</label>
-            <input
-              type="datetime-local"
-              className="form-input"
-              value={notBefore}
-              onChange={(e) => setNotBefore(e.target.value)}
-              disabled={isGenerating}
-              step="1"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">notAfter(有效期结束):</label>
-            <input
-              type="datetime-local"
-              className="form-input"
-              value={notAfter}
-              onChange={(e) => setNotAfter(e.target.value)}
-              disabled={isGenerating}
-              step="1"
-            />
-          </div>
-        </div>
-
-        {/* uniqueId */}
-        <div className="form-group">
-          <label className="form-label">uniqueId(可选):</label>
-          <input
-            type="text"
-            className="form-input"
-            value={uniqueId}
-            onChange={(e) => setUniqueId(e.target.value)}
-            placeholder="可选，下载证书时以该id作为文件夹名称"
-            disabled={isGenerating}
-          />
-          <div className="hint-text">可选，下载证书时以该id作为文件夹名称，否则以证书序列号作为文件夹名称</div>
-        </div>
-
-        {/* sans备用名称 */}
-        <div className="form-group">
-          <label className="form-label">sans备用名称(可选):</label>
-          <input
-            type="text"
-            className="form-input"
-            value={sans}
-            onChange={(e) => setSans(e.target.value)}
-            placeholder="格式如: dNSName=[domain.com,domain1.com];iPAddress=[127.0.0.1]"
-            disabled={isGenerating}
-          />
-          <div className="hint-text">格式如: dNSName=[domain.com,domain1.com];iPAddress=[127.0.0.1]</div>
-        </div>
-
-        {/* 输出文件路径 */}
-        <div className="form-group">
-          <label className="form-label">输出CSV文件:</label>
-          <div className="file-input-wrapper">
-            <input
-              type="text"
-              className="form-input"
-              value={outputPath}
-              onChange={(e) => setOutputPath(e.target.value)}
-              disabled={isGenerating}
-            />
-            <button
-              className="btn btn-secondary"
-              onClick={browseOutputFile}
-              disabled={isGenerating}
-            >
-              浏览...
-            </button>
-          </div>
-        </div>
-
-        {/* 生成按钮 */}
-        <div className="generate-btn-container">
-          <button
-            className={`btn btn-primary btn-large ${isGenerating ? "generating" : ""}`}
-            onClick={startGeneration}
-            disabled={isGenerating}
+      <Card 
+        title={
+          <Space>
+            <SettingOutlined />
+            参数设置
+          </Space>
+        }
+        style={{ marginBottom: '24px' }}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            cnRange,
+            subjectTemplate,
+            keyType,
+            signHashAlg,
+            notBefore,
+            notAfter,
+            uniqueId,
+            sans,
+            outputDir,
+          }}
+        >
+          {/* 通用名称范围 */}
+          <Form.Item
+            label="通用名称(CN)范围"
+            name="cnRange"
+            rules={[{ required: true, message: '请输入通用名称范围!' }]}
+            help="格式示例: YDL0001-YDL0010"
           >
-            {isGenerating ? "生成中..." : "开始生成CSV"}
-          </button>
-        </div>
-      </div>
+            <Input
+              value={cnRange}
+              onChange={(e) => setCnRange(e.target.value)}
+              placeholder="格式示例: YDL0001-YDL0010"
+              disabled={isGenerating}
+            />
+          </Form.Item>
+
+          {/* Subject主题模板 */}
+          <Form.Item
+            label="Subject主题模板"
+            name="subjectTemplate"
+            rules={[{ required: true, message: '请输入Subject主题模板!' }]}
+            help='使用{CN}作为通用名称占位符，多值用逗号分隔，值中逗号用\,转义'
+          >
+            <Input
+              value={subjectTemplate}
+              onChange={(e) => setSubjectTemplate(e.target.value)}
+              placeholder="使用{CN}作为通用名称占位符"
+              disabled={isGenerating}
+            />
+          </Form.Item>
+
+          {/* 密钥类型和签名哈希算法 */}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="密钥类型"
+                name="keyType"
+                rules={[{ required: true, message: '请选择密钥类型!' }]}
+              >
+                <Select
+                  value={keyType}
+                  onChange={setKeyType}
+                  disabled={isGenerating}
+                >
+                  {KEY_TYPES.map((type) => (
+                    <Select.Option key={type.value} value={type.value}>
+                      {type.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="签名哈希算法"
+                name="signHashAlg"
+                rules={[{ required: true, message: '请选择签名哈希算法!' }]}
+              >
+                <Select
+                  value={signHashAlg}
+                  onChange={setSignHashAlg}
+                  disabled={isGenerating}
+                >
+                  {SIGN_HASH_ALGORITHMS.map((alg) => (
+                    <Select.Option key={alg} value={alg}>
+                      {alg}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* 有效期 */}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="notBefore(有效期开始)"
+                name="notBefore"
+                rules={[{ required: true, message: '请选择有效期开始时间!' }]}
+              >
+                <DatePicker
+                  showTime
+                  value={notBefore}
+                  onChange={(date) => setNotBefore(date || dayjs())}
+                  disabled={isGenerating}
+                  style={{ width: '100%' }}
+                  format="YYYY-MM-DD HH:mm:ss"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="notAfter(有效期结束)"
+                name="notAfter"
+                rules={[{ required: true, message: '请选择有效期结束时间!' }]}
+              >
+                <DatePicker
+                  showTime
+                  value={notAfter}
+                  onChange={(date) => setNotAfter(date || dayjs().add(10, 'year'))}
+                  disabled={isGenerating}
+                  style={{ width: '100%' }}
+                  format="YYYY-MM-DD HH:mm:ss"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* uniqueId */}
+          <Form.Item
+            label="uniqueId(可选)"
+            name="uniqueId"
+            help="可选，下载证书时以该id作为文件夹名称，否则以证书序列号作为文件夹名称"
+          >
+            <Input
+              value={uniqueId}
+              onChange={(e) => setUniqueId(e.target.value)}
+              placeholder="可选，下载证书时以该id作为文件夹名称"
+              disabled={isGenerating}
+            />
+          </Form.Item>
+
+          {/* sans备用名称 */}
+          <Form.Item
+            label="sans备用名称(可选)"
+            name="sans"
+            help="格式如: dNSName=[domain.com,domain1.com];iPAddress=[127.0.0.1]"
+          >
+            <Input
+              value={sans}
+              onChange={(e) => setSans(e.target.value)}
+              placeholder="格式如: dNSName=[domain.com,domain1.com];iPAddress=[127.0.0.1]"
+              disabled={isGenerating}
+            />
+          </Form.Item>
+
+          {/* 输出目录 */}
+          <Form.Item
+            label="输出目录"
+            name="outputDir"
+            rules={[{ required: true, message: '请选择输出目录!' }]}
+          >
+            <Input.Group compact>
+              <Input
+                style={{ width: 'calc(100% - 100px)' }}
+                value={outputDir}
+                onChange={(e) => setOutputDir(e.target.value)}
+                disabled={isGenerating}
+                placeholder="请选择CSV文件输出目录"
+              />
+              <Button
+                style={{ width: '100px' }}
+                icon={<FolderOpenOutlined />}
+                onClick={browseOutputDir}
+                disabled={isGenerating}
+              >
+                浏览
+              </Button>
+            </Input.Group>
+          </Form.Item>
+
+          {/* 生成按钮 */}
+          <Form.Item style={{ textAlign: 'center', marginTop: '32px', marginBottom: '16px' }}>
+            <Button
+              type="primary"
+              size="large"
+              icon={<PlayCircleOutlined />}
+              onClick={startGeneration}
+              disabled={isGenerating}
+              loading={isGenerating}
+              style={{ minWidth: '200px', height: '48px', fontSize: '16px' }}
+            >
+              {isGenerating ? "生成中..." : "开始生成CSV"}
+            </Button>
+          </Form.Item>
+
+          {/* 进度条 */}
+          {(isGenerating || progress > 0) && (
+            <Form.Item style={{ marginBottom: '24px' }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography.Text strong>进度状态: {progressText}</Typography.Text>
+                  <Typography.Text>{progress}%</Typography.Text>
+                </div>
+                <Progress 
+                  percent={progress} 
+                  status={progress === 100 ? 'success' : progress === 0 && progressText === '错误' ? 'exception' : 'active'}
+                  strokeColor={progress === 100 ? '#52c41a' : undefined}
+                />
+                <Typography.Text type="secondary">{statusText}</Typography.Text>
+              </Space>
+            </Form.Item>
+          )}
+        </Form>
+      </Card>
 
       {/* 生成日志卡片 */}
-      <div className="card">
-        <h2 className="card-title">生成日志</h2>
-        <div className="log-area" ref={logAreaRef}>
+      <Card 
+        title={
+          <Space>
+            <FileTextOutlined />
+            生成日志
+          </Space>
+        }
+      >
+        <div 
+          ref={logAreaRef}
+          style={{
+            height: '300px',
+            overflow: 'auto',
+            backgroundColor: '#f5f5f5',
+            padding: '12px',
+            borderRadius: '6px',
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            lineHeight: '1.4',
+            marginBottom: '16px',
+            border: '1px solid #d9d9d9'
+          }}
+        >
           {logs.map((log, index) => (
-            <div key={index}>{log}</div>
+            <div key={index} style={{ marginBottom: '2px' }}>
+              {log}
+            </div>
           ))}
         </div>
-
-        {/* 进度条 */}
-        <div className="progress-container">
-          <div className="progress-bar-wrapper">
-            <div className="progress-bar" style={{ width: `${progress}%` }}></div>
-            <span className="progress-text">{progressText}</span>
-          </div>
-          <div className="status-label">{statusText}</div>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }
